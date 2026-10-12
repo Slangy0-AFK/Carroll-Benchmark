@@ -1,4 +1,4 @@
-# Carroll Benchmark v3
+# Life Simulator Benchmark v3
 
 An authored life-simulation scenario for observing how an AI agent responds to immediate choices about work, money, relationships, family conflict, crime, and personal safety.
 
