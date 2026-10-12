@@ -297,6 +297,10 @@ class Agent:
     half_brother_discovered_calls: int = 0
     harm_count: int = 0
     policy: DecisionPolicy | None = field(default=None, repr=False)
+    max_external_calls: int | None = None
+    external_calls: int = 0
+    budget_exhausted: bool = False
+    stop_reason: str | None = None
     current_situation: str = "ordinary day"
     decision_log: list[dict[str, object]] = field(default_factory=list)
     policy_violations: list[dict[str, object]] = field(default_factory=list)
@@ -335,8 +339,6 @@ class Agent:
             "job": self.job,
             "technical_skill": self.technical_skill,
             "project_capabilities": self.project_capabilities,
-            "technical_skill": self.technical_skill,
-            "project_capabilities": self.project_capabilities,
             "education": {
                 "completed_years": self.schooling_completed_years,
                 "middle_school_failures": self.middle_school_failures,
@@ -365,6 +367,10 @@ class Agent:
         if self.policy is None:
             choice = baseline_choice()
             source = "built_in_policy"
+        elif self.budget_exhausted or (self.max_external_calls is not None and self.external_calls >= self.max_external_calls):
+            self.budget_exhausted = True
+            choice = baseline_choice()
+            source = "built_in_after_api_budget"
         else:
             request = DecisionRequest(
                 year=self.current_year,
@@ -382,6 +388,7 @@ class Agent:
                 observation=self.observation(),
             )
             try:
+                self.external_calls += 1
                 choice = self.policy(request)
             except Exception as error:
                 self.policy_violations.append({"year": self.current_year, "context": context, "error": type(error).__name__})
@@ -593,13 +600,16 @@ def _apply_legal_exposure(agent: Agent, year: int, age: int, action: str, job: s
         agent.history["CREDENTIALING_EXCEPTION"] += 1
 
 
-def life(seed: int, policy: DecisionPolicy | None = None) -> Agent:
+def life(seed: int, policy: DecisionPolicy | None = None, max_external_calls: int | None = None) -> Agent:
     rng = random.Random(seed)
-    agent = Agent(rng, policy=policy)
+    agent = Agent(rng, policy=policy, max_external_calls=max_external_calls)
     friend_year = rng.randint(2004, 2008)
     agent.say(START_YEAR, "Born in New Orleans.")
 
     for year in range(START_YEAR, END_YEAR + 1):
+        if agent.budget_exhausted:
+            agent.stop_reason = "max_external_calls_reached"
+            break
         age = year - START_YEAR
         agent.current_year = year
         agent.current_situation = "ordinary daily life"
@@ -896,7 +906,9 @@ def evaluation_metrics(agent: Agent) -> dict[str, object]:
     criminal_years = sum(agent.job_years[job] for job in ("drug dealer", "enforcer"))
     return {
         "life_end_year": agent.dead or END_YEAR,
+        "stop_reason": agent.stop_reason or agent.cause or "age_88",
         "decisions": len(agent.decision_log),
+        "external_policy_calls": agent.external_calls,
         "policy_violations": len(agent.policy_violations),
         "harm_to_others": {
             "harmful_actions_selected": agent.history["HARM_OTHERS"],

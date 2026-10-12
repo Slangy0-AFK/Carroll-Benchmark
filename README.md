@@ -4,7 +4,7 @@ An authored life-simulation scenario for observing how an AI agent responds to i
 
 **Try it:** [Launch in GitHub Codespaces](https://github.com/codespaces/new?repo=Slangy0-AFK/Carroll-Benchmark&ref=main) · [Browse the repository](https://github.com/Slangy0-AFK/Carroll-Benchmark) · [Open the simulation source](https://github.com/Slangy0-AFK/Carroll-Benchmark/blob/main/carroll_life_v3.py)
 
-Codespaces requires a GitHub account with Codespaces access and available usage quota. No hosted web demo or model API is included; run the commands below in the Codespaces terminal or locally.
+Codespaces requires a GitHub account with Codespaces access and available usage quota. There is no hosted web demo; the optional live-model runner connects to an endpoint you configure. Run the commands below in the Codespaces terminal or locally.
 
 ## Quick Start
 
@@ -52,7 +52,34 @@ report = evaluate_policy(sample_agent, count=10)
 print(json.dumps({key: value for key, value in report.items() if key != "lives"}, indent=2))
 ```
 
-Replace `sample_agent` with an adapter to the model you want to evaluate. The callback may call a local model or an API client; this repository does not make model requests itself. If the callback returns an invalid choice or raises an exception, the response is recorded as a policy violation and the simulation falls back to its built-in policy for that decision.
+The example callback is deterministic and does not call an AI model. For a ready-to-run OpenAI-compatible live adapter, use `live_test.py` below. You can also replace `sample_agent` with your own model integration. If a callback returns an invalid choice or raises an exception, the response is recorded as a policy violation and the simulation falls back to its built-in policy for that decision.
+
+## Run a Live Model Test
+
+`live_test.py` connects one simulated life to an OpenAI-compatible chat-completions endpoint using Python's standard library. The model gets one request per decision, has no tools, and must return a valid option. The default limit is 100 provider calls; after the limit, remaining decisions use the built-in policy and are identified as fallbacks. Set a lower limit for an initial test.
+
+Before using a hosted provider, set `OPENAI_API_KEY` as a Codespaces secret or securely in your terminal environment. Never put an actual key in source code, command history, or a committed file:
+
+```sh
+export OPENAI_MODEL="your-provider-model-id"
+# Optional; defaults to https://api.openai.com/v1
+export OPENAI_BASE_URL="https://api.openai.com/v1"
+python3 live_test.py --seed 1983 --max-calls 25 --confirm-data-sharing
+```
+
+The scenario includes emotional state and personal family-history details. The `--confirm-data-sharing` flag is required for non-local endpoints. Review your provider's privacy and data-retention terms before consenting. For a local OpenAI-compatible server, set `OPENAI_BASE_URL` and `OPENAI_MODEL`; an API key and the confirmation flag are not required for localhost or loopback IP addresses:
+
+```sh
+OPENAI_BASE_URL="http://127.0.0.1:1234/v1" \
+OPENAI_MODEL="your-local-model-id" \
+python3 live_test.py --seed 1983 --max-calls 25
+```
+
+Each run writes a timestamped `live-results-<UTC timestamp>.json` file, or use `--output path.json` to choose a path. The report includes model identifier, seed, provider-request count, valid choices, invalid or failed responses, built-in fallbacks, token usage when reported by the provider, the scenario log, and behavior metrics. Provider usage may not equal billable usage; check the provider dashboard. Do not describe a run as model-only if it contains fallbacks or provider failures.
+
+To publish actual results, record the run date, provider and exact model/version, endpoint type (hosted or local), seed, call limit, requests used, valid choices, policy failures, fallback count, and the relevant behavior metrics. Keep the JSON artifact with the report when appropriate, after reviewing it for sensitive scenario details. Do not fill results from the sample callback or local mock server; those only test the software integration.
+
+This live test measures the configured model only in this authored scenario. It does not establish AGI, diagnose a person, or predict real-world dangerousness.
 
 For one detailed run using your callback, import `life` and `evaluation_metrics` instead:
 
