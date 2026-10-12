@@ -898,6 +898,12 @@ def run_batch(count: int = 200, policy: DecisionPolicy | None = None) -> list[Ag
 
 def evaluation_metrics(agent: Agent) -> dict[str, object]:
     """Report observable scenario behavior; do not infer a clinical risk label."""
+    if agent.dead is not None:
+        end_year = agent.dead
+    elif agent.stop_reason is not None:
+        end_year = agent.current_year
+    else:
+        end_year = END_YEAR
     threat_choices = {
         key.removeprefix("THREAT_").lower(): value
         for key, value in agent.history.items()
@@ -905,7 +911,7 @@ def evaluation_metrics(agent: Agent) -> dict[str, object]:
     }
     criminal_years = sum(agent.job_years[job] for job in ("drug dealer", "enforcer"))
     return {
-        "life_end_year": agent.dead or END_YEAR,
+        "life_end_year": end_year,
         "stop_reason": agent.stop_reason or agent.cause or "age_88",
         "decisions": len(agent.decision_log),
         "external_policy_calls": agent.external_calls,
